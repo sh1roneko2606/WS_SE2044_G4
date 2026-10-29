@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weather Station</title>
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--text:#1f1e1c;--muted:#6b6a65;--line:#e2e0d8;
+--temp:#d85a30;--hum:#378add;--rain:#1d9e75;--ok:#1d9e75;--bad:#e24b4a}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--card:#1f1f1c;--text:#ecebe6;
+--muted:#9a988f;--line:#33322e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:960px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+h1{font-size:22px;margin:0}
+#sub{margin:2px 0 0;color:var(--muted);font-size:13px}
+.pill{padding:4px 12px;border-radius:999px;font-size:13px;font-weight:600;color:#fff}
+.pill.on{background:var(--ok)}.pill.off{background:var(--bad)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px}
+.card,.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.lbl{color:var(--muted);font-size:13px}
+.val{font-size:38px;font-weight:600;line-height:1.2}
+.val small{font-size:16px;font-weight:400;color:var(--muted);margin-left:4px}
+.note{color:var(--muted);font-size:13px}
+.range{display:flex;gap:8px;margin-bottom:12px}
+.range button{border:1px solid var(--line);background:var(--card);color:var(--text);
+padding:6px 14px;border-radius:8px;font:inherit;cursor:pointer}
+.range button.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+.panel{margin-bottom:12px}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ph h2{font-size:15px;margin:0}.ph span{color:var(--muted);font-size:12px}
+canvas{width:100%;height:190px;display:block;margin-top:6px}
+#tip{position:fixed;display:none;background:var(--text);color:var(--bg);
+padding:4px 8px;border-radius:6px;font-size:12px;pointer-events:none;white-space:nowrap}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>Weather station</h1><p id="sub">Waiting for data...</p></div>
+    <span id="pill" class="pill off">Offline</span>
+  </header>
+
+  <section class="cards">
+    <div class="card"><div class="lbl">Temperature</div>
+      <div class="val"><span id="vt">--</span><small>&deg;C</small></div></div>
+    <div class="card"><div class="lbl">Humidity</div>
+      <div class="val"><span id="vh">--</span><small>%</small></div></div>
+    <div class="card"><div class="lbl">Rain</div>
+      <div class="val"><span id="vr">--</span><small>%</small></div>
+      <div id="rs" class="note">--</div></div>
+  </section>
+
+  <div class="range" id="range">
+    <button data-h="1">1 h</button>
+    <button data-h="6" class="active">6 h</button>
+    <button data-h="24">24 h</button>
+    <button data-h="168">7 days</button>
+  </div>
+
+  <section class="panel"><div class="ph"><h2>Temperature</h2><span id="st"></span></div><canvas id="ct"></canvas></section>
+  <section class="panel"><div class="ph"><h2>Humidity</h2><span id="sh"></span></div><canvas id="ch"></canvas></section>
+  <section class="panel"><div class="ph"><h2>Rain</h2><span id="sr"></span></div><canvas id="cr"></canvas></section>
+</main>
+<div id="tip"></div>
+
+<script>
+let hours = 6;
+const series = {t: [], h: [], r: []};
+const $ = id => document.getElementById(id);
+const tip = $('tip');
+
+function fmtTime(ts, long) {
+  const d = new Date(ts * 1000);
+  const time = d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  return long ? d.toLocaleDateString([], {month: 'short', day: 'numeric'}) + ' ' + time : time;
+}
+function ago(s) {
+  if (s < 60) return s + ' s';
+  if (s < 3600) return Math.floor(s / 60) + ' min';
+  return Math.floor(s / 3600) + ' h';
+}
+async function getJSON(url) {
+  const r = await fetch(url, {cache: 'no-store'});
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function loadLatest() {
+  try {
+    const d = await getJSON('api/latest');
+    if (!d.has_data) { $('sub').textContent = 'Waiting for the first reading...'; return; }
+    $('vt').textContent = d.t.toFixed(1);
+    $('vh').textContent = Math.round(d.h);
+    $('vr').textContent = d.rain;
+    $('rs').textContent = d.status;
+    $('pill').textContent = d.online ? 'Online' : 'Offline';
+    $('pill').className = 'pill ' + (d.online ? 'on' : 'off');
+    $('sub').textContent = 'Updated ' + ago(d.age) + ' ago';
+  } catch (e) {
+    $('pill').textContent = 'No connection';
+    $('pill').className = 'pill off';
+  }
+}
+
+async function loadHistory() {
+  try {
+    const d = await getJSON('api/history?hours=' + hours);
+    series.t = d.points.map(p => ({x: p[0], y: p[1]}));
+    series.h = d.points.map(p => ({x: p[0], y: p[2]}));
+    series.r = d.points.map(p => ({x: p[0], y: p[3]}));
+    render();
+  } catch (e) { /* keep the previous charts */ }
+}
+
+function render() {
+  chart($('ct'), series.t, '--temp', '\u00B0C', null, null, $('st'));
+  chart($('ch'), series.h, '--hum', '%', 0, 100, $('sh'));
+  chart($('cr'), series.r, '--rain', '%', 0, 100, $('sr'));
+}
+
+function chart(cv, pts, cssVar, unit, fMin, fMax, statEl) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cs = getComputedStyle(document.documentElement);
+  const color = cs.getPropertyValue(cssVar).trim();
+  const muted = cs.getPropertyValue('--muted').trim();
+  const grid = cs.getPropertyValue('--line').trim();
+  cv._pts = []; cv._unit = unit;
+  c.font = '11px system-ui, sans-serif';
+  if (!pts.length) {
+    c.fillStyle = muted; c.textAlign = 'left';
+    c.fillText('No data for this range yet', 12, h / 2);
+    statEl.textContent = ''; return;
+  }
+  const ys = pts.map(p => p.y);
+  let min = fMin != null ? fMin : Math.min(...ys);
+  let max = fMax != null ? fMax : Math.max(...ys);
+  if (fMin == null) { const pad = (max - min) * 0.2 || 1; min -= pad; max += pad; }
+  const L = 38, R = 10, T = 8, B = 22;
+  const x0 = pts[0].x, span = Math.max(1, pts[pts.length - 1].x - x0);
+  const sx = x => L + (x - x0) / span * (w - L - R);
+  const sy = y => T + (1 - (y - min) / (max - min)) * (h - T - B);
+
+  c.strokeStyle = grid; c.fillStyle = muted; c.lineWidth = 1; c.textAlign = 'right';
+  for (let i = 0; i <= 3; i++) {
+    const v = min + (max - min) * i / 3, y = sy(v);
+    c.beginPath(); c.moveTo(L, y); c.lineTo(w - R, y); c.stroke();
+    c.fillText(v.toFixed(fMin != null ? 0 : 1), L - 6, y + 4);
+  }
+  const long = hours > 24;
+  c.textAlign = 'left'; c.fillText(fmtTime(x0, long), L, h - 6);
+  c.textAlign = 'right'; c.fillText(fmtTime(pts[pts.length - 1].x, long), w - R, h - 6);
+
+  const gap = Math.max(90, Math.max(1, hours * 3600 / 300) * 3);  // break line when offline
+  c.strokeStyle = color; c.lineWidth = 2; c.lineJoin = 'round'; c.beginPath();
+  pts.forEach((p, i) => {
+    const px = sx(p.x), py = sy(p.y);
+    cv._pts.push({px, x: p.x, y: p.y});
+    if (i === 0 || p.x - pts[i - 1].x > gap) c.moveTo(px, py); else c.lineTo(px, py);
+  });
+  c.stroke();
+  const last = pts[pts.length - 1];
+  c.fillStyle = color; c.beginPath();
+  c.arc(sx(last.x), sy(last.y), 3.5, 0, Math.PI * 2); c.fill();
+
+  const avg = ys.reduce((a, b) => a + b, 0) / ys.length;
+  statEl.textContent = 'min ' + Math.min(...ys).toFixed(1) + ' \u00B7 avg ' + avg.toFixed(1) +
+                       ' \u00B7 max ' + Math.max(...ys).toFixed(1) + ' ' + unit;
+}
+
+document.querySelectorAll('canvas').forEach(cv => {
+  cv.addEventListener('mousemove', e => {
+    const pts = cv._pts; if (!pts || !pts.length) return;
+    const mx = e.clientX - cv.getBoundingClientRect().left;
+    let best = pts[0];
+    for (const p of pts) if (Math.abs(p.px - mx) < Math.abs(best.px - mx)) best = p;
+    tip.style.display = 'block';
+    tip.textContent = best.y.toFixed(1) + ' ' + cv._unit + ' \u00B7 ' + fmtTime(best.x, hours > 24);
+    tip.style.left = (e.clientX + 12) + 'px';
+    tip.style.top = (e.clientY - 30) + 'px';
+  });
+  cv.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+});
+
+$('range').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  hours = Number(b.dataset.h);
+  document.querySelectorAll('#range button').forEach(x => x.classList.toggle('active', x === b));
+  loadHistory();
+});
+window.addEventListener('resize', render);
+
+loadLatest(); loadHistory();
+setInterval(loadLatest, 5000);
+setInterval(loadHistory, 30000);
+</script>
+</body>
+</html>
