@@ -73,9 +73,9 @@ The stack uses variables from `.env` and defaults from `.env.example`.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `NTFY_TOPIC` | ntfy channel used for alerts | `ws-gr4-se2044-fptu` |
+| `NTFY_TOPIC` | ntfy channel used for alerts | `YOUR_NTFY_TOPIC` |
 | `NTFY_SERVER` | ntfy server URL | `https://ntfy.sh` |
-| `NTFY_TOKEN` | optional authentication token | empty |
+| `NTFY_TOKEN` | optional authentication token | `YOUR_NTFY_TOKEN` |
 | `MQTT_HOST` | MQTT broker hostname | `mosquitto` |
 | `MQTT_TOPIC` | topic for sensor messages | `weather/data` |
 | `TEMP_HIGH` | high temperature alert threshold | `35` |
@@ -83,7 +83,7 @@ The stack uses variables from `.env` and defaults from `.env.example`.
 | `RAIN_ON` | rain intensity threshold | `30` |
 | `ALERT_COOLDOWN` | cooldown between repeated alerts | `1800` |
 | `OFFLINE_AFTER` | time before station is marked offline | `180` |
-| `THINGSPEAK_API_KEY` | ThingSpeak API key | empty |
+| `THINGSPEAK_API_KEY` | ThingSpeak API key | `YOUR_THINGSPEAK_API_KEY` |
 | `SIM_INTERVAL` | simulator publish interval | `5` |
 
 ## Flashing the NodeMCU
