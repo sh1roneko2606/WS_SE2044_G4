@@ -5,14 +5,14 @@ This project builds a small IoT weather monitoring system using a NodeMCU board 
 ## Architecture
 
 ```text
-        NodeMCU sensor node
-                │
+NodeMCU sensor node
+        │
         ▼
-        MQTT broker (Mosquitto)
-                │
-   ┌────────────┼──────────────┐
-   │            │              │
-   ▼            ▼              ▼
+MQTT broker (Mosquitto)
+        │
+   ┌────┼────┐
+   │    │    │
+   ▼    ▼    ▼
 Dashboard  Alert bot  Optional simulator
 ```
 
