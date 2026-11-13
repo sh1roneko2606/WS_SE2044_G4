@@ -9,16 +9,16 @@ NodeMCU sensor node
         │
         ▼
 MQTT broker (Mosquitto)
-        │
-   ┌────┼────┐
-   │    │    │
-   ▼    ▼    ▼
+                            │
+   ┌────────┼──────────┐
+   │                      │                            │
+   ▼                    ▼                            ▼
 Dashboard  Alert bot  Optional simulator
 ```
 
 The system includes:
 - a NodeMCU sketch that reads sensor values and publishes them to MQTT
-- a Mosquitto broker for message transport
+- a Mosquitto─ broker for message transport
 - a Flask dashboard for live readings and recent history
 - an alert service that pushes notifications via ntfy
 - optional ThingSpeak integration for cloud uploads
@@ -174,4 +174,4 @@ weather-station-docker/
 
 ## License
 
-This project is intended for coursework / local development use and is not published under a formal license unless your course or team adds one.
+This project is intended for coursework / local development use and is not published under a formal license.
